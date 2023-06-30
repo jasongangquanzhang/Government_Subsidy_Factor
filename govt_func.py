@@ -31,4 +31,5 @@ def get_quarter(df: pd.DataFrame):
     ]
     df_q3 = df_q3.diff(1, axis=1)
     df_q3 = df_q3.filter(like="Q3", axis=1).replace(0, np.nan)
+    
     return pd.concat([df_q1, df_q2, df_q3], axis=1).sort_index(axis=1)
