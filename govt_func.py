@@ -21,7 +21,7 @@ def get_quarter(df: pd.DataFrame):
         df_q2.insert(i, str(year) + "Q0", 0)
 
     df_q2 = df_q2.sort_index(axis=1)
-    
+    #fjf;lakjflksaejflksaj
     df_q2 = df_q2.interpolate(axis=1)  # if Q1 is nan, it would become q2/2
     df_q2 = df_q2.diff(1, axis=1)  # difference
     df_q2 = df_q2.filter(like="Q2", axis=1).replace(0, np.nan)
