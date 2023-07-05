@@ -70,3 +70,67 @@ def get_industry_exposure(stock_ind_list: pd.DataFrame, industry_list):
     df = pd.DataFrame(
         index=industry_list, columns=df1["instrument"]
     )  # a matrix with industry as index, stock code as columns
+    df = df.sort_index(axis=1)
+    df1 = df1.sort_index().reset_index().set_index("instrument")
+    groups_dict = df1.groupby("INDUSTRY").groups
+
+    for item in groups_dict:
+        for i in groups_dict[item]:
+            df[i][item] = 1  # modify the corresponding coordinate in df
+
+    return df.fillna(0)
+
+
+def industry_neutralization(df: pd.DataFrame, ind_name: str, industry_list: list):
+    df1 = df.reset_index()[["instrument", ind_name]]
+    dummy_industry = get_industry_exposure(df1, industry_list)
+    df = pd.merge(
+        left=df.reset_index().set_index("instrument"),
+        right=dummy_industry.T,
+        left_index=True,
+        right_index=True,
+        how="outer",
+    )
+
+    return df.reset_index().set_index(["datetime", "instrument"]).sort_index()
+
+
+def neutralization(df: pd.DataFrame, factor: str):
+    df1 = df
+    x = df1.drop(factor, axis=1)  # independent variables(Mkt_cap, industry)
+    y = df1[factor]
+    result = sm.OLS(y.astype(float), x.astype(float), missing="drop").fit()
+
+    return result.resid
+
+
+def dataframe_neutralization(
+    df: pd.DataFrame, ind_name: str, ind_list: list, cap_name: str
+):
+    factor_lst = df.columns.to_list()  # get index of all factors
+    factor_lst.remove(cap_name)
+    factor_lst.remove(ind_name)
+
+    df1 = df
+    df1[cap_name] = df1[cap_name].apply(lambda x: math.log(x))  # mkt_cap = ln(mkt_cap)
+    df1 = industry_neutralization(
+        df1, ind_name=ind_name, industry_list=ind_list
+    )  # get industry exposure
+    df1 = df1.drop(ind_name, axis=1)  # delete original industry code
+
+    for factor in factor_lst:  # neutralize all factors
+        drop_list = factor_lst[:]  # all factor
+        drop_list.remove(factor)  # drop all factor except the factor we need
+        df2 = df1.drop(drop_list, axis=1)  # only keep mkt_cap, industry, factor
+        df2 = df2.dropna()
+        df2 = (
+            df2.groupby("datetime")
+            .apply(neutralization, factor)
+            .droplevel(1)
+            .reset_index()
+            .rename(columns={0: factor})
+            .set_index(["datetime", "instrument"])
+        ) #neutralize the factor
+        df.update(df2)
+        print(factor)
+        return df
